@@ -1,0 +1,84 @@
+$ python3 main.py programs/stalls.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | SW R2      | ADDI R2    | ADDI R1    | -          | -         
+    4 | LW R3      | SW R2      | ADDI R2    | ADDI R1    | -         
+        ├─ ! RAW: SW R2 needs R2 from ADDI R2 (in EX)
+        └─ ! RAW: SW R2 needs R1 from ADDI R1 (in MEM)
+
+    5 | SW R3      | LW R3      | SW R2      | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=4
+        ├─ ⇢ FWD MEM/WB->EX: R1=4 (ADDI R1 -> SW R2)
+        └─ ⇢ FWD EX/MEM->EX: R2=7 (ADDI R2 -> SW R2)
+
+    6 | LW R4      | SW R3      | LW R3      | SW R2      | ADDI R2   
+        ├─ ✎ WB: R2=7
+        ├─ ✎ MEM: Mem[8]=7
+        ├─ ! RAW: SW R3 needs R3 from LW R3 (in EX)
+        └─ ⏸ STALL (load-use): SW R3 waits for R3 from LW R3
+
+    7 | LW R4      | SW R3      | bubble     | LW R3      | SW R2     
+    8 | BEQ R4     | LW R4      | SW R3      | bubble     | LW R3     
+        ├─ ✎ WB: R3=7
+        └─ ⇢ FWD MEM/WB->EX: R3=7 (LW R3 -> SW R3)
+
+    9 | ADDI R5    | BEQ R4     | LW R4      | SW R3      | bubble    
+        ├─ ✎ MEM: Mem[12]=7
+        ├─ ! RAW: BEQ R4 needs R4 from LW R4 (in EX)
+        └─ ⏸ STALL (load-use): BEQ R4 waits for R4 from LW R4
+
+   10 | ADDI R5    | BEQ R4     | bubble     | LW R4      | SW R3     
+   11 | LW R6      | ADDI R5    | BEQ R4     | bubble     | LW R4     
+        ├─ ✎ WB: R4=7
+        ├─ ⇢ FWD MEM/WB->EX: R4=7 (LW R4 -> BEQ R4)
+        └─ ↪ BRANCH BEQ R4 TAKEN -> PC=32; FLUSH: ADDI R5 (ID), LW R6 (IF)
+
+   12 | LW R6      | bubble     | bubble     | BEQ R4     | bubble    
+   13 | ADD R7     | LW R6      | bubble     | bubble     | BEQ R4    
+   14 | HALT       | ADD R7     | LW R6      | bubble     | bubble    
+        ├─ ! RAW: ADD R7 needs R6 from LW R6 (in EX)
+        └─ ⏸ STALL (load-use): ADD R7 waits for R6 from LW R6
+
+   15 | HALT       | ADD R7     | bubble     | LW R6      | bubble    
+   16 | -          | HALT       | ADD R7     | bubble     | LW R6     
+        ├─ ✎ WB: R6=7
+        ├─ ⇢ FWD MEM/WB->EX: R6=7 (LW R6 -> ADD R7)
+        └─ ⇢ FWD MEM/WB->EX: R6=7 (LW R6 -> ADD R7)
+
+   17 | -          | -          | HALT       | ADD R7     | bubble    
+   18 | -          | -          | -          | HALT       | ADD R7    
+        └─ ✎ WB: R7=14
+
+   19 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 4
+R2  = 7
+R3  = 7
+R4  = 7
+R6  = 7
+R7  = 14
+--- Data Memory ---
+Mem[8] = 7
+Mem[12] = 7
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 19         
+Instructions completed (N) : 10         (incl. NOP/HALT)
+CPI                        : 1.900      (C / N)
+IPC                        : 0.526      (N / C)
+Ideal cycles               : 14         (N + 4)
+Lost cycles                : 5          (C - ideal)
+Pipeline efficiency        : 73.7%      (ideal / C)
+Stage utilization          : 52.6%      (N / C)
+Speedup vs non-pipelined   : 2.63x      (5N / C)
+Data hazards               : 4          (RAW detected in ID)
+Forwarding operations      : 6          (per operand)
+Pipeline stalls            : 3          (load-use: 3)
+Control hazards            : 1          (taken: 1)
+Branch flushes             : 1          (2 instr. flushed)

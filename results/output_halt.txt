@@ -1,0 +1,35 @@
+$ python3 main.py programs/halt.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | HALT       | ADDI R1    | -          | -          | -         
+    3 | -          | HALT       | ADDI R1    | -          | -         
+    4 | -          | -          | HALT       | ADDI R1    | -         
+    5 | -          | -          | -          | HALT       | ADDI R1   
+        └─ ✎ WB: R1=1
+
+    6 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 1
+--- Data Memory ---
+(data memory is empty)
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 6          
+Instructions completed (N) : 2          (incl. NOP/HALT)
+CPI                        : 3.000      (C / N)
+IPC                        : 0.333      (N / C)
+Ideal cycles               : 6          (N + 4)
+Lost cycles                : 0          (C - ideal)
+Pipeline efficiency        : 100.0%     (ideal / C)
+Stage utilization          : 33.3%      (N / C)
+Speedup vs non-pipelined   : 1.67x      (5N / C)
+Data hazards               : 0          (RAW detected in ID)
+Forwarding operations      : 0          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 0          (taken: 0)
+Branch flushes             : 0          (0 instr. flushed)

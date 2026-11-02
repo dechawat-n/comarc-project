@@ -1,0 +1,76 @@
+$ python3 main.py programs/memory.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | ADDI R3    | ADDI R2    | ADDI R1    | -          | -         
+    4 | ADDI R4    | ADDI R3    | ADDI R2    | ADDI R1    | -         
+    5 | SW R2      | ADDI R4    | ADDI R3    | ADDI R2    | ADDI R1   
+        └─ ✎ WB: R1=100
+
+    6 | SW R3      | SW R2      | ADDI R4    | ADDI R3    | ADDI R2   
+        └─ ✎ WB: R2=11
+
+    7 | SW R4      | SW R3      | SW R2      | ADDI R4    | ADDI R3   
+        └─ ✎ WB: R3=22
+
+    8 | LW R5      | SW R4      | SW R3      | SW R2      | ADDI R4   
+        ├─ ✎ WB: R4=-33
+        └─ ✎ MEM: Mem[100]=11
+
+    9 | LW R6      | LW R5      | SW R4      | SW R3      | SW R2     
+        └─ ✎ MEM: Mem[104]=22
+
+   10 | LW R7      | LW R6      | LW R5      | SW R4      | SW R3     
+        └─ ✎ MEM: Mem[96]=-33
+
+   11 | LW R8      | LW R7      | LW R6      | LW R5      | SW R4     
+   12 | ADD R9     | LW R8      | LW R7      | LW R6      | LW R5     
+        └─ ✎ WB: R5=22
+
+   13 | HALT       | ADD R9     | LW R8      | LW R7      | LW R6     
+        └─ ✎ WB: R6=-33
+
+   14 | -          | HALT       | ADD R9     | LW R8      | LW R7     
+        └─ ✎ WB: R7=11
+
+   15 | -          | -          | HALT       | ADD R9     | LW R8     
+        └─ ✎ WB: R8=0
+
+   16 | -          | -          | -          | HALT       | ADD R9    
+        └─ ✎ WB: R9=-11
+
+   17 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 100
+R2  = 11
+R3  = 22
+R4  = -33
+R5  = 22
+R6  = -33
+R7  = 11
+R9  = -11
+--- Data Memory ---
+Mem[96] = -33
+Mem[100] = 11
+Mem[104] = 22
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 17         
+Instructions completed (N) : 13         (incl. NOP/HALT)
+CPI                        : 1.308      (C / N)
+IPC                        : 0.765      (N / C)
+Ideal cycles               : 17         (N + 4)
+Lost cycles                : 0          (C - ideal)
+Pipeline efficiency        : 100.0%     (ideal / C)
+Stage utilization          : 76.5%      (N / C)
+Speedup vs non-pipelined   : 3.82x      (5N / C)
+Data hazards               : 0          (RAW detected in ID)
+Forwarding operations      : 0          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 0          (taken: 0)
+Branch flushes             : 0          (0 instr. flushed)

@@ -1,0 +1,10 @@
+# ตัวอย่างโปรแกรมจาก spec
+ADDI R1 R0 10
+ADDI R2 R0 20
+ADD R3 R1 R2
+SUB R4 R3 R1
+SW R3 0(R0)
+LW R5 0(R0)
+BEQ R4 R2 2
+NOP
+HALT

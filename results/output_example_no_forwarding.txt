@@ -1,0 +1,69 @@
+$ python3 main.py programs/example.asm --run --no-forwarding
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | ADD R3     | ADDI R2    | ADDI R1    | -          | -         
+    4 | SUB R4     | ADD R3     | ADDI R2    | ADDI R1    | -         
+        ├─ ! RAW: ADD R3 needs R2 from ADDI R2 (in EX)
+        ├─ ! RAW: ADD R3 needs R1 from ADDI R1 (in MEM)
+        └─ ⏸ STALL (no forwarding): ADD R3 waits for R2 from ADDI R2 (in EX)
+
+    5 | SUB R4     | ADD R3     | bubble     | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=10
+        └─ ⏸ STALL (no forwarding): ADD R3 waits for R2 from ADDI R2 (in MEM)
+
+    6 | SUB R4     | ADD R3     | bubble     | bubble     | ADDI R2   
+        └─ ✎ WB: R2=20
+
+    7 | SW R3      | SUB R4     | ADD R3     | bubble     | bubble    
+        ├─ ! RAW: SUB R4 needs R3 from ADD R3 (in EX)
+        └─ ⏸ STALL (no forwarding): SUB R4 waits for R3 from ADD R3 (in EX)
+
+    8 | SW R3      | SUB R4     | bubble     | ADD R3     | bubble    
+        └─ ⏸ STALL (no forwarding): SUB R4 waits for R3 from ADD R3 (in MEM)
+
+    9 | SW R3      | SUB R4     | bubble     | bubble     | ADD R3    
+        └─ ✎ WB: R3=30
+
+   10 | LW R5      | SW R3      | SUB R4     | bubble     | bubble    
+   11 | BEQ R4     | LW R5      | SW R3      | SUB R4     | bubble    
+   12 | NOP        | BEQ R4     | LW R5      | SW R3      | SUB R4    
+        ├─ ✎ WB: R4=20
+        └─ ✎ MEM: Mem[0]=30
+
+   13 | HALT       | NOP        | BEQ R4     | LW R5      | SW R3     
+        └─ ↪ BRANCH BEQ R4 TAKEN -> PC=36; FLUSH: NOP (ID), HALT (IF)
+
+   14 | -          | bubble     | bubble     | BEQ R4     | LW R5     
+        └─ ✎ WB: R5=30
+
+   15 | -          | -          | bubble     | bubble     | BEQ R4    
+
+--- Registers (non-zero) ---
+R1  = 10
+R2  = 20
+R3  = 30
+R4  = 20
+R5  = 30
+--- Data Memory ---
+Mem[0] = 30
+
+=== Performance Statistics ===
+Data hazard handling       : stall      
+Control hazard handling    : predict    
+Total clock cycles (C)     : 15         
+Instructions completed (N) : 7          (incl. NOP/HALT)
+CPI                        : 2.143      (C / N)
+IPC                        : 0.467      (N / C)
+Ideal cycles               : 11         (N + 4)
+Lost cycles                : 4          (C - ideal)
+Pipeline efficiency        : 73.3%      (ideal / C)
+Stage utilization          : 46.7%      (N / C)
+Speedup vs non-pipelined   : 2.33x      (5N / C)
+Data hazards               : 2          (RAW detected in ID)
+Forwarding operations      : 0          (per operand)
+Pipeline stalls            : 4          (load-use: 0)
+Control hazards            : 1          (taken: 1)
+Branch flushes             : 1          (2 instr. flushed)

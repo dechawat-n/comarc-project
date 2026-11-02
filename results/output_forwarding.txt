@@ -1,0 +1,76 @@
+$ python3 main.py programs/forwarding.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | ADD R3     | ADDI R2    | ADDI R1    | -          | -         
+        └─ ! RAW: ADDI R2 needs R1 from ADDI R1 (in EX)
+
+    4 | SUB R4     | ADD R3     | ADDI R2    | ADDI R1    | -         
+        ├─ ⇢ FWD EX/MEM->EX: R1=5 (ADDI R1 -> ADDI R2)
+        ├─ ! RAW: ADD R3 needs R2 from ADDI R2 (in EX)
+        └─ ! RAW: ADD R3 needs R1 from ADDI R1 (in MEM)
+
+    5 | AND R5     | SUB R4     | ADD R3     | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=5
+        ├─ ⇢ FWD MEM/WB->EX: R1=5 (ADDI R1 -> ADD R3)
+        ├─ ⇢ FWD EX/MEM->EX: R2=8 (ADDI R2 -> ADD R3)
+        └─ ! RAW: SUB R4 needs R3 from ADD R3 (in EX)
+
+    6 | OR R6      | AND R5     | SUB R4     | ADD R3     | ADDI R2   
+        ├─ ✎ WB: R2=8
+        ├─ ⇢ FWD EX/MEM->EX: R3=13 (ADD R3 -> SUB R4)
+        ├─ ! RAW: AND R5 needs R4 from SUB R4 (in EX)
+        └─ ! RAW: AND R5 needs R3 from ADD R3 (in MEM)
+
+    7 | ADDI R0    | OR R6      | AND R5     | SUB R4     | ADD R3    
+        ├─ ✎ WB: R3=13
+        ├─ ⇢ FWD MEM/WB->EX: R3=13 (ADD R3 -> AND R5)
+        ├─ ⇢ FWD EX/MEM->EX: R4=8 (SUB R4 -> AND R5)
+        └─ ! RAW: OR R6 needs R5 from AND R5 (in EX)
+
+    8 | ADD R7     | ADDI R0    | OR R6      | AND R5     | SUB R4    
+        ├─ ✎ WB: R4=8
+        └─ ⇢ FWD EX/MEM->EX: R5=8 (AND R5 -> OR R6)
+
+    9 | HALT       | ADD R7     | ADDI R0    | OR R6      | AND R5    
+        └─ ✎ WB: R5=8
+
+   10 | -          | HALT       | ADD R7     | ADDI R0    | OR R6     
+        └─ ✎ WB: R6=13
+
+   11 | -          | -          | HALT       | ADD R7     | ADDI R0   
+   12 | -          | -          | -          | HALT       | ADD R7    
+        └─ ✎ WB: R7=5
+
+   13 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 5
+R2  = 8
+R3  = 13
+R4  = 8
+R5  = 8
+R6  = 13
+R7  = 5
+--- Data Memory ---
+(data memory is empty)
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 13         
+Instructions completed (N) : 9          (incl. NOP/HALT)
+CPI                        : 1.444      (C / N)
+IPC                        : 0.692      (N / C)
+Ideal cycles               : 13         (N + 4)
+Lost cycles                : 0          (C - ideal)
+Pipeline efficiency        : 100.0%     (ideal / C)
+Stage utilization          : 69.2%      (N / C)
+Speedup vs non-pipelined   : 3.46x      (5N / C)
+Data hazards               : 5          (RAW detected in ID)
+Forwarding operations      : 7          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 0          (taken: 0)
+Branch flushes             : 0          (0 instr. flushed)

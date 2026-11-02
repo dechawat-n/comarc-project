@@ -1,0 +1,33 @@
+$ python3 -m unittest discover -s tests -v
+test_all_programs (test_simulator.TestAgainstReferenceModel) ... ok
+test_control_none_executes_two_slots_after_branch (test_simulator.TestAgainstReferenceModel) ... ok
+test_control_stall_mode_matches_reference (test_simulator.TestAgainstReferenceModel)
+control hazard แบบ Detect-and-Stall ต้องให้ผลถูกเหมือนกัน (แค่ช้ากว่า) ... ok
+test_gui_server_simulate (test_simulator.TestAgainstReferenceModel) ... ok
+test_no_hazard_handling_gives_wrong_result (test_simulator.TestAgainstReferenceModel)
+โหมด none: ไม่มี hazard unit -> example.asm ได้ค่าผิดแบบเดียวกับขั้นที่ 3 ของการพัฒนา ... ok
+test_random_programs (test_simulator.TestAgainstReferenceModel)
+สุ่มโปรแกรม 500 ตัว (dependency หนาแน่น, LW/SW, branch ไปข้างหน้า) เทียบกับ reference ... ok
+test_arithmetic (test_simulator.TestPrograms) ... ok
+test_branch_not_taken (test_simulator.TestPrograms) ... ok
+test_branch_taken_flush (test_simulator.TestPrograms) ... ok
+test_forwarding (test_simulator.TestPrograms) ... ok
+test_halt (test_simulator.TestPrograms) ... ok
+test_infinite_loop_guard (test_simulator.TestPrograms) ... ok
+test_load_use (test_simulator.TestPrograms) ... ok
+test_loop (test_simulator.TestPrograms) ... ok
+test_memory (test_simulator.TestPrograms) ... ok
+test_no_forwarding_needs_nops (test_simulator.TestPrograms) ... ok
+test_spec_example_branch_past_end (test_simulator.TestPrograms) ... ok
+test_stalls (test_simulator.TestPrograms) ... ok
+test_without_forwarding_values_still_correct_but_slower (test_simulator.TestPrograms) ... ok
+test_int32_wraparound (test_simulator.TestUnits) ... ok
+test_memory_alignment (test_simulator.TestUnits) ... ok
+test_parse_errors (test_simulator.TestUnits) ... ok
+test_parse_formats (test_simulator.TestUnits) ... ok
+test_r0_is_always_zero (test_simulator.TestUnits) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 0.921s
+
+OK

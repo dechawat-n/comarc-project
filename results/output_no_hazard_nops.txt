@@ -1,0 +1,45 @@
+$ python3 main.py programs/no_hazard_nops.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | NOP        | ADDI R2    | ADDI R1    | -          | -         
+    4 | NOP        | NOP        | ADDI R2    | ADDI R1    | -         
+    5 | ADD R3     | NOP        | NOP        | ADDI R2    | ADDI R1   
+        └─ ✎ WB: R1=10
+
+    6 | HALT       | ADD R3     | NOP        | NOP        | ADDI R2   
+        └─ ✎ WB: R2=20
+
+    7 | -          | HALT       | ADD R3     | NOP        | NOP       
+    8 | -          | -          | HALT       | ADD R3     | NOP       
+    9 | -          | -          | -          | HALT       | ADD R3    
+        └─ ✎ WB: R3=30
+
+   10 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 10
+R2  = 20
+R3  = 30
+--- Data Memory ---
+(data memory is empty)
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 10         
+Instructions completed (N) : 6          (incl. NOP/HALT)
+CPI                        : 1.667      (C / N)
+IPC                        : 0.600      (N / C)
+Ideal cycles               : 10         (N + 4)
+Lost cycles                : 0          (C - ideal)
+Pipeline efficiency        : 100.0%     (ideal / C)
+Stage utilization          : 60.0%      (N / C)
+Speedup vs non-pipelined   : 3.00x      (5N / C)
+Data hazards               : 0          (RAW detected in ID)
+Forwarding operations      : 0          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 0          (taken: 0)
+Branch flushes             : 0          (0 instr. flushed)

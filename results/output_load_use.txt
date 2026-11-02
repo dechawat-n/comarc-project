@@ -1,0 +1,60 @@
+$ python3 main.py programs/load_use.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | SW R1      | ADDI R1    | -          | -          | -         
+    3 | LW R2      | SW R1      | ADDI R1    | -          | -         
+        └─ ! RAW: SW R1 needs R1 from ADDI R1 (in EX)
+
+    4 | ADD R3     | LW R2      | SW R1      | ADDI R1    | -         
+        └─ ⇢ FWD EX/MEM->EX: R1=100 (ADDI R1 -> SW R1)
+
+    5 | SUB R4     | ADD R3     | LW R2      | SW R1      | ADDI R1   
+        ├─ ✎ WB: R1=100
+        ├─ ✎ MEM: Mem[8]=100
+        ├─ ! RAW: ADD R3 needs R2 from LW R2 (in EX)
+        └─ ⏸ STALL (load-use): ADD R3 waits for R2 from LW R2
+
+    6 | SUB R4     | ADD R3     | bubble     | LW R2      | SW R1     
+    7 | HALT       | SUB R4     | ADD R3     | bubble     | LW R2     
+        ├─ ✎ WB: R2=100
+        ├─ ⇢ FWD MEM/WB->EX: R2=100 (LW R2 -> ADD R3)
+        └─ ! RAW: SUB R4 needs R3 from ADD R3 (in EX)
+
+    8 | -          | HALT       | SUB R4     | ADD R3     | bubble    
+        └─ ⇢ FWD EX/MEM->EX: R3=200 (ADD R3 -> SUB R4)
+
+    9 | -          | -          | HALT       | SUB R4     | ADD R3    
+        └─ ✎ WB: R3=200
+
+   10 | -          | -          | -          | HALT       | SUB R4    
+        └─ ✎ WB: R4=100
+
+   11 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 100
+R2  = 100
+R3  = 200
+R4  = 100
+--- Data Memory ---
+Mem[8] = 100
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 11         
+Instructions completed (N) : 6          (incl. NOP/HALT)
+CPI                        : 1.833      (C / N)
+IPC                        : 0.545      (N / C)
+Ideal cycles               : 10         (N + 4)
+Lost cycles                : 1          (C - ideal)
+Pipeline efficiency        : 90.9%      (ideal / C)
+Stage utilization          : 54.5%      (N / C)
+Speedup vs non-pipelined   : 2.73x      (5N / C)
+Data hazards               : 3          (RAW detected in ID)
+Forwarding operations      : 3          (per operand)
+Pipeline stalls            : 1          (load-use: 1)
+Control hazards            : 0          (taken: 0)
+Branch flushes             : 0          (0 instr. flushed)

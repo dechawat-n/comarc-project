@@ -1,0 +1,62 @@
+$ python3 main.py programs/branch_not_taken.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | BEQ R1     | ADDI R2    | ADDI R1    | -          | -         
+    4 | ADDI R3    | BEQ R1     | ADDI R2    | ADDI R1    | -         
+        ├─ ! RAW: BEQ R1 needs R2 from ADDI R2 (in EX)
+        └─ ! RAW: BEQ R1 needs R1 from ADDI R1 (in MEM)
+
+    5 | ADDI R4    | ADDI R3    | BEQ R1     | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=5
+        ├─ ⇢ FWD MEM/WB->EX: R1=5 (ADDI R1 -> BEQ R1)
+        ├─ ⇢ FWD EX/MEM->EX: R2=7 (ADDI R2 -> BEQ R1)
+        └─ → BRANCH BEQ R1 NOT TAKEN (prediction correct, no penalty)
+
+    6 | BNE R1     | ADDI R4    | ADDI R3    | BEQ R1     | ADDI R2   
+        └─ ✎ WB: R2=7
+
+    7 | ADDI R5    | BNE R1     | ADDI R4    | ADDI R3    | BEQ R1    
+    8 | ADDI R6    | ADDI R5    | BNE R1     | ADDI R4    | ADDI R3   
+        ├─ ✎ WB: R3=111
+        └─ ↪ BRANCH BNE R1 TAKEN -> PC=28; FLUSH: ADDI R5 (ID), ADDI R6 (IF)
+
+    9 | ADDI R6    | bubble     | bubble     | BNE R1     | ADDI R4   
+        └─ ✎ WB: R4=222
+
+   10 | HALT       | ADDI R6    | bubble     | bubble     | BNE R1    
+   11 | -          | HALT       | ADDI R6    | bubble     | bubble    
+   12 | -          | -          | HALT       | ADDI R6    | bubble    
+   13 | -          | -          | -          | HALT       | ADDI R6   
+        └─ ✎ WB: R6=444
+
+   14 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 5
+R2  = 7
+R3  = 111
+R4  = 222
+R6  = 444
+--- Data Memory ---
+(data memory is empty)
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 14         
+Instructions completed (N) : 8          (incl. NOP/HALT)
+CPI                        : 1.750      (C / N)
+IPC                        : 0.571      (N / C)
+Ideal cycles               : 12         (N + 4)
+Lost cycles                : 2          (C - ideal)
+Pipeline efficiency        : 85.7%      (ideal / C)
+Stage utilization          : 57.1%      (N / C)
+Speedup vs non-pipelined   : 2.86x      (5N / C)
+Data hazards               : 1          (RAW detected in ID)
+Forwarding operations      : 2          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 2          (taken: 1)
+Branch flushes             : 1          (2 instr. flushed)

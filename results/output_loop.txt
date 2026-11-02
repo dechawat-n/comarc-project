@@ -1,0 +1,110 @@
+$ python3 main.py programs/loop.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | ADD R1     | ADDI R2    | ADDI R1    | -          | -         
+    4 | ADDI R2    | ADD R1     | ADDI R2    | ADDI R1    | -         
+        ├─ ! RAW: ADD R1 needs R2 from ADDI R2 (in EX)
+        └─ ! RAW: ADD R1 needs R1 from ADDI R1 (in MEM)
+
+    5 | BNE R2     | ADDI R2    | ADD R1     | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=0
+        ├─ ⇢ FWD MEM/WB->EX: R1=0 (ADDI R1 -> ADD R1)
+        ├─ ⇢ FWD EX/MEM->EX: R2=5 (ADDI R2 -> ADD R1)
+        └─ ! RAW: ADDI R2 needs R2 from ADDI R2 (in MEM)
+
+    6 | SW R1      | BNE R2     | ADDI R2    | ADD R1     | ADDI R2   
+        ├─ ✎ WB: R2=5
+        ├─ ⇢ FWD MEM/WB->EX: R2=5 (ADDI R2 -> ADDI R2)
+        └─ ! RAW: BNE R2 needs R2 from ADDI R2 (in EX)
+
+    7 | HALT       | SW R1      | BNE R2     | ADDI R2    | ADD R1    
+        ├─ ✎ WB: R1=5
+        ├─ ⇢ FWD EX/MEM->EX: R2=4 (ADDI R2 -> BNE R2)
+        └─ ↪ BRANCH BNE R2 TAKEN -> PC=8; FLUSH: SW R1 (ID), HALT (IF)
+
+    8 | ADD R1     | bubble     | bubble     | BNE R2     | ADDI R2   
+        └─ ✎ WB: R2=4
+
+    9 | ADDI R2    | ADD R1     | bubble     | bubble     | BNE R2    
+   10 | BNE R2     | ADDI R2    | ADD R1     | bubble     | bubble    
+   11 | SW R1      | BNE R2     | ADDI R2    | ADD R1     | bubble    
+        └─ ! RAW: BNE R2 needs R2 from ADDI R2 (in EX)
+
+   12 | HALT       | SW R1      | BNE R2     | ADDI R2    | ADD R1    
+        ├─ ✎ WB: R1=9
+        ├─ ⇢ FWD EX/MEM->EX: R2=3 (ADDI R2 -> BNE R2)
+        └─ ↪ BRANCH BNE R2 TAKEN -> PC=8; FLUSH: SW R1 (ID), HALT (IF)
+
+   13 | ADD R1     | bubble     | bubble     | BNE R2     | ADDI R2   
+        └─ ✎ WB: R2=3
+
+   14 | ADDI R2    | ADD R1     | bubble     | bubble     | BNE R2    
+   15 | BNE R2     | ADDI R2    | ADD R1     | bubble     | bubble    
+   16 | SW R1      | BNE R2     | ADDI R2    | ADD R1     | bubble    
+        └─ ! RAW: BNE R2 needs R2 from ADDI R2 (in EX)
+
+   17 | HALT       | SW R1      | BNE R2     | ADDI R2    | ADD R1    
+        ├─ ✎ WB: R1=12
+        ├─ ⇢ FWD EX/MEM->EX: R2=2 (ADDI R2 -> BNE R2)
+        └─ ↪ BRANCH BNE R2 TAKEN -> PC=8; FLUSH: SW R1 (ID), HALT (IF)
+
+   18 | ADD R1     | bubble     | bubble     | BNE R2     | ADDI R2   
+        └─ ✎ WB: R2=2
+
+   19 | ADDI R2    | ADD R1     | bubble     | bubble     | BNE R2    
+   20 | BNE R2     | ADDI R2    | ADD R1     | bubble     | bubble    
+   21 | SW R1      | BNE R2     | ADDI R2    | ADD R1     | bubble    
+        └─ ! RAW: BNE R2 needs R2 from ADDI R2 (in EX)
+
+   22 | HALT       | SW R1      | BNE R2     | ADDI R2    | ADD R1    
+        ├─ ✎ WB: R1=14
+        ├─ ⇢ FWD EX/MEM->EX: R2=1 (ADDI R2 -> BNE R2)
+        └─ ↪ BRANCH BNE R2 TAKEN -> PC=8; FLUSH: SW R1 (ID), HALT (IF)
+
+   23 | ADD R1     | bubble     | bubble     | BNE R2     | ADDI R2   
+        └─ ✎ WB: R2=1
+
+   24 | ADDI R2    | ADD R1     | bubble     | bubble     | BNE R2    
+   25 | BNE R2     | ADDI R2    | ADD R1     | bubble     | bubble    
+   26 | SW R1      | BNE R2     | ADDI R2    | ADD R1     | bubble    
+        └─ ! RAW: BNE R2 needs R2 from ADDI R2 (in EX)
+
+   27 | HALT       | SW R1      | BNE R2     | ADDI R2    | ADD R1    
+        ├─ ✎ WB: R1=15
+        ├─ ⇢ FWD EX/MEM->EX: R2=0 (ADDI R2 -> BNE R2)
+        └─ → BRANCH BNE R2 NOT TAKEN (prediction correct, no penalty)
+
+   28 | -          | HALT       | SW R1      | BNE R2     | ADDI R2   
+        └─ ✎ WB: R2=0
+
+   29 | -          | -          | HALT       | SW R1      | BNE R2    
+        └─ ✎ MEM: Mem[0]=15
+
+   30 | -          | -          | -          | HALT       | SW R1     
+   31 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 15
+--- Data Memory ---
+Mem[0] = 15
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 31         
+Instructions completed (N) : 19         (incl. NOP/HALT)
+CPI                        : 1.632      (C / N)
+IPC                        : 0.613      (N / C)
+Ideal cycles               : 23         (N + 4)
+Lost cycles                : 8          (C - ideal)
+Pipeline efficiency        : 74.2%      (ideal / C)
+Stage utilization          : 61.3%      (N / C)
+Speedup vs non-pipelined   : 3.06x      (5N / C)
+Data hazards               : 7          (RAW detected in ID)
+Forwarding operations      : 8          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 5          (taken: 4)
+Branch flushes             : 4          (8 instr. flushed)

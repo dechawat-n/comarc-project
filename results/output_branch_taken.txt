@@ -1,0 +1,52 @@
+$ python3 main.py programs/branch_taken.asm --run
+
+Cycle | IF         | ID         | EX         | MEM        | WB        
+----------------------------------------------------------------------
+    1 | ADDI R1    | -          | -          | -          | -         
+    2 | ADDI R2    | ADDI R1    | -          | -          | -         
+    3 | BEQ R1     | ADDI R2    | ADDI R1    | -          | -         
+    4 | ADDI R3    | BEQ R1     | ADDI R2    | ADDI R1    | -         
+        ├─ ! RAW: BEQ R1 needs R2 from ADDI R2 (in EX)
+        └─ ! RAW: BEQ R1 needs R1 from ADDI R1 (in MEM)
+
+    5 | ADDI R4    | ADDI R3    | BEQ R1     | ADDI R2    | ADDI R1   
+        ├─ ✎ WB: R1=5
+        ├─ ⇢ FWD MEM/WB->EX: R1=5 (ADDI R1 -> BEQ R1)
+        ├─ ⇢ FWD EX/MEM->EX: R2=5 (ADDI R2 -> BEQ R1)
+        └─ ↪ BRANCH BEQ R1 TAKEN -> PC=20; FLUSH: ADDI R3 (ID), ADDI R4 (IF)
+
+    6 | ADDI R5    | bubble     | bubble     | BEQ R1     | ADDI R2   
+        └─ ✎ WB: R2=5
+
+    7 | HALT       | ADDI R5    | bubble     | bubble     | BEQ R1    
+    8 | -          | HALT       | ADDI R5    | bubble     | bubble    
+    9 | -          | -          | HALT       | ADDI R5    | bubble    
+   10 | -          | -          | -          | HALT       | ADDI R5   
+        └─ ✎ WB: R5=333
+
+   11 | -          | -          | -          | -          | HALT      
+
+--- Registers (non-zero) ---
+R1  = 5
+R2  = 5
+R5  = 333
+--- Data Memory ---
+(data memory is empty)
+
+=== Performance Statistics ===
+Data hazard handling       : forwarding 
+Control hazard handling    : predict    
+Total clock cycles (C)     : 11         
+Instructions completed (N) : 5          (incl. NOP/HALT)
+CPI                        : 2.200      (C / N)
+IPC                        : 0.455      (N / C)
+Ideal cycles               : 9          (N + 4)
+Lost cycles                : 2          (C - ideal)
+Pipeline efficiency        : 81.8%      (ideal / C)
+Stage utilization          : 45.5%      (N / C)
+Speedup vs non-pipelined   : 2.27x      (5N / C)
+Data hazards               : 1          (RAW detected in ID)
+Forwarding operations      : 2          (per operand)
+Pipeline stalls            : 0          (load-use: 0)
+Control hazards            : 1          (taken: 1)
+Branch flushes             : 1          (2 instr. flushed)

@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline Simulator</title>
+<style>
+:root{
+  --bg:#eef0f3; --panel:#ffffff; --ink:#1c2230; --muted:#6b7280; --line:#d9dde3; --soft:#f3f4f6;
+  --IF:#2563eb; --ID:#7c3aed; --EX:#ea580c; --MEM:#16a34a; --WB:#0f766e;
+  --stall:#d97706; --flush:#dc2626; --fwd:#2563eb; --raw:#9333ea; --chg:#fde68a; --onc:#ffffff;
+  --latch:#b8bec8; --fld:#f9c9cf; --fldh:#fde68a; --wire:#9aa1ad; --box:#e5e7eb;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0d1015; --panel:#161a22; --ink:#e5e8ee; --muted:#98a1b0; --line:#2a303b; --soft:#1e232d;
+    --IF:#60a5fa; --ID:#a78bfa; --EX:#fb923c; --MEM:#4ade80; --WB:#2dd4bf;
+    --stall:#fbbf24; --flush:#f87171; --fwd:#60a5fa; --raw:#c084fc; --chg:#5b4a10; --onc:#0d1015;
+    --latch:#3a414d; --fld:#5a2d36; --fldh:#6b5512; --wire:#5d6573; --box:#262c37; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Thai","Thonburi",sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.wrap{max-width:1280px;margin:0 auto;padding:12px 16px 40px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;margin:4px 0 10px}
+h1{font-size:19px;margin:0}
+h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:6px}
+h2 small{text-transform:none;letter-spacing:0;font-weight:400}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.muted{color:var(--muted)}
+
+/* datapath */
+#dpPanel{padding:8px}
+#dp{width:100%;height:auto;display:block}
+#dp text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:var(--ink)}
+#dp .bar{fill:var(--onc);font-weight:700;font-size:13px}
+#dp .lt{fill:var(--latch)}
+#dp .ln{font-size:11px;font-weight:800;fill:var(--ink)}
+#dp .fld{fill:var(--fld)}
+#dp .fld.h{fill:var(--fldh)}
+#dp .fl{font-size:9px;fill:var(--muted)}
+#dp .fv{font-weight:700}
+#dp .w{stroke:var(--wire);stroke-width:1.6}
+#dp .w.on{stroke-width:3.4}
+#dp .box{fill:var(--box);stroke:var(--wire);stroke-width:1}
+#dp .bt{font-size:11px;font-weight:700}
+#dp .st{font-size:11px}
+#dp .mux{fill:#f4b183;stroke:#c9773d}
+#dp .alu{fill:#9ca3af;stroke:#6b7280}
+#dp .badge{font-size:10px;font-weight:800;fill:var(--onc)}
+
+/* lower panels */
+.cols{display:grid;grid-template-columns:1.15fr 1fr 1fr 1.25fr;gap:12px}
+textarea{width:100%;height:300px;resize:vertical;border:1px solid var(--line);border-radius:8px;background:var(--soft);
+  color:var(--ink);padding:8px;font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+select,button{font:inherit;border:1px solid var(--line);background:var(--soft);color:var(--ink);border-radius:8px;padding:6px 10px}
+select{width:100%}
+button{cursor:pointer}
+button:hover:not(:disabled){border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--IF);border-color:var(--IF);color:var(--onc);font-weight:700}
+button.go{background:var(--MEM);border-color:var(--MEM);color:var(--onc);font-weight:700}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cyc{font-size:18px;font-weight:800;margin:4px 0}
+.err{color:var(--flush);font-size:13px;margin-top:6px;white-space:pre-wrap}
+.listing{height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:6px 0;font-size:13px}
+.listing div{display:flex;gap:8px;padding:2px 8px;align-items:center}
+.listing .a{color:var(--muted);width:30px;text-align:right}
+.listing .t{flex:1;white-space:pre}
+.listing .b span{font-size:10px;font-weight:800;color:var(--onc);padding:1px 5px;border-radius:4px;margin-left:3px}
+.log{list-style:none;margin:0;padding:0;display:grid;gap:5px;max-height:260px;overflow:auto}
+.log li{padding:5px 8px;border-radius:7px;border-left:4px solid var(--k);background:var(--soft);font-size:12px}
+.log .i{font-weight:800;color:var(--k);margin-right:4px}
+.log .th{display:block;color:var(--muted);font-size:11px}
+.opt label{display:block;font-weight:700;font-size:13px;margin:8px 0 4px}
+.opt p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.ref{margin-top:12px;padding:8px 10px;border-radius:8px;font-size:12px}
+.ref.ok{background:color-mix(in srgb,var(--MEM) 15%,transparent)}
+.ref.bad{background:color-mix(in srgb,var(--flush) 15%,transparent)}
+.ref.warn{background:color-mix(in srgb,var(--stall) 18%,transparent)}
+.regs{display:grid;grid-template-columns:repeat(4,1fr);gap:3px}
+.reg{display:flex;justify-content:space-between;padding:2px 6px;border-radius:5px;background:var(--soft);font-size:12px}
+.reg .n{color:var(--muted)} .reg.z .v{color:var(--muted)} .reg.c{background:var(--chg);font-weight:800}
+.mem{max-height:150px;overflow:auto;margin-top:8px}
+.mem div{display:flex;justify-content:space-between;padding:2px 6px;border-radius:5px;background:var(--soft);margin-bottom:3px;font-size:12px}
+.mem div.c{background:var(--chg);font-weight:800}
+
+/* pipeline diagram */
+.gridwrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:8px}
+table.pd{border-collapse:separate;border-spacing:0;font-size:12px}
+table.pd th,table.pd td{padding:0;text-align:center;border-bottom:1px solid var(--line)}
+table.pd thead th{position:sticky;top:0;background:var(--panel);z-index:2;min-width:36px;height:26px;cursor:pointer;color:var(--muted)}
+table.pd th.lbl,table.pd td.lbl{position:sticky;left:0;background:var(--panel);z-index:1;text-align:left;padding:0 10px;white-space:nowrap;min-width:140px;border-right:1px solid var(--line)}
+table.pd thead th.lbl{z-index:3}
+table.pd td.c{height:26px;min-width:36px;cursor:pointer}
+table.pd td.c span{display:inline-block;min-width:31px;padding:1px 0;border-radius:5px;color:var(--onc);font-weight:700;font-size:11px}
+table.pd .cur{background:color-mix(in srgb,var(--IF) 12%,transparent)}
+table.pd thead th.cur{color:var(--IF);font-weight:800}
+td.c span.s{background:repeating-linear-gradient(45deg,var(--stall) 0 4px,color-mix(in srgb,var(--stall) 65%,#000) 4px 8px)}
+td.c span.f{background:var(--flush);text-decoration:line-through}
+tr.fl td.lbl{color:var(--flush);text-decoration:line-through}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:22px;height:12px;border-radius:3px;vertical-align:middle;margin-right:4px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.stat{background:var(--soft);border-radius:8px;padding:7px 10px}
+.stat .v{font-size:19px;font-weight:800} .stat .k{font-size:12px;color:var(--muted)}
+kbd{font:11px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:var(--soft)}
+@media (max-width:1100px){ .cols{grid-template-columns:1fr 1fr} }
+@media (max-width:640px){ .cols{grid-template-columns:1fr} #dpPanel{overflow-x:auto} #dp{min-width:900px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>CPU Pipeline Simulator <span class="muted" style="font-weight:400;font-size:14px">· 5-stage MIPS-like</span></h1>
+  <span class="muted" style="font-size:12px">คีย์ลัด: <kbd>→</kbd> step · <kbd>←</kbd> ย้อน · <kbd>Space</kbd> run/pause (เมื่อไม่ได้พิมพ์โค้ดอยู่)</span>
+</header>
+
+<div class="panel" id="dpPanel"><svg id="dp" viewBox="0 0 1200 500" role="img" aria-label="Pipeline datapath"></svg></div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>Instruction Memory <button id="bEdit" style="padding:2px 10px;font-size:12px">✎ แก้โค้ด</button></h2>
+    <select id="preset"><option value="">— เลือกโปรแกรมตัวอย่าง —</option></select>
+    <div style="height:6px"></div>
+    <textarea id="src" spellcheck="false" placeholder="พิมพ์โปรแกรม เช่น&#10;ADDI R1 R0 10&#10;ADD R2 R1 R1&#10;HALT"></textarea>
+    <div class="listing mono" id="listing" hidden></div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Control</h2>
+    <div class="btns">
+      <button class="primary" id="bAsm">Assemble</button>
+      <button id="bReset" disabled>Reset</button>
+    </div>
+    <div class="btns">
+      <button id="bBack" disabled title="ย้อน 1 cycle">◀ Back</button>
+      <button class="go" id="bStep" disabled title="เดิน 1 cycle">Step ▶</button>
+      <button class="go" id="bRun" disabled title="เล่นอัตโนมัติ">▶▶ Run</button>
+      <button id="bEnd" disabled title="ไปจนจบ">⏭</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px" class="muted">ช้า<input type="range" id="speed" min="100" max="1500" step="50" value="700" style="direction:rtl;flex:1">เร็ว</div>
+    <div class="cyc" id="cyc">ยังไม่ได้ assemble</div>
+    <ul class="log" id="log"></ul>
+  </div>
+
+  <div class="panel opt">
+    <h2>Pipeline Options</h2>
+    <label for="dataMode">Data Hazards</label>
+    <select id="dataMode">
+      <option value="none">None (ผู้ใช้ใส่ NOP เอง)</option>
+      <option value="stall">Detect and Stall</option>
+      <option value="forwarding" selected>Forwarding</option>
+    </select>
+    <p id="dataDesc"></p>
+    <label for="ctrlMode">Control Hazards</label>
+    <select id="ctrlMode">
+      <option value="none">None (ผู้ใช้ใส่ NOP เอง)</option>
+      <option value="stall">Detect and Stall</option>
+      <option value="predict" selected>Predict Not-Taken + Flush</option>
+    </select>
+    <p id="ctrlDesc"></p>
+    <div id="ref"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Registers <small>(เหลือง = เพิ่งเปลี่ยน)</small></h2>
+    <div class="regs mono" id="regs"></div>
+    <h2 style="margin-top:12px">Data Memory</h2>
+    <div class="mem mono" id="mem"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Pipeline Diagram <small>(แถว = คำสั่ง, คอลัมน์ = cycle · คลิกเพื่อกระโดดไป cycle นั้น)</small></h2>
+  <div class="gridwrap" id="grid"><div class="muted" style="padding:12px">กด Assemble เพื่อเริ่ม</div></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div class="panel">
+  <h2>Performance <small>(เมื่อรันจบ)</small></h2>
+  <div class="stats" id="stats"></div>
+</div>
+</div>
+
+<script>
+"use strict";
+const STAGES = ["IF","ID","EX","MEM","WB"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const DATA_DESC = {
+  forwarding: "Forwarding จาก EX/MEM และ MEM/WB เข้า EX; stall 1 cycle เฉพาะ load-use (ดีไซน์หลักของโปรเจกต์)",
+  stall: "ไม่มี forwarding: ตรวจ RAW แล้ว stall จน producer ถึง WB",
+  none: "ไม่ตรวจและไม่แก้ hazard: ผู้ใช้ต้องใส่ NOP เอง ไม่งั้นผลจะผิด (ดูช่องตรวจผลด้านล่าง)"
+};
+const CTRL_DESC = {
+  predict: "เดาว่าไม่ taken แล้ว fetch ต่อ ถ้า branch taken (รู้ผลที่ EX) จะ flush 2 คำสั่งใน IF/ID",
+  stall: "เมื่อเจอ branch จะหยุด fetch จนรู้ผลที่ EX: เสีย 2 cycle ทุก branch แต่ไม่มี flush",
+  none: "ไม่จัดการ: 2 คำสั่งถัดจาก branch ทำงานเสมอ ผู้ใช้ต้องใส่ NOP 2 ตัวหลัง branch เอง"
+};
+
+let T = null;          // trace จาก server
+let REF = null, WARN = null;
+let cur = -1;          // -1 = ก่อน cycle 1
+let timer = null;
+let inst = {};
+
+/* ======================= Datapath SVG ======================= */
+const LX = {L1:165, L2:470, L3:785, L4:1030}, LWID = 80;
+function R(x,y,w,h,cls,ex=""){ return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" class="${cls}" ${ex}/>`; }
+function Tx(x,y,s,cls="",anc="middle",ex=""){ return `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anc}" ${ex}>${esc(s)}</text>`; }
+function W(d,on,color){ return `<path d="${d}" class="w${on?" on":""}" fill="none" ${on?`style="stroke:${color}"`:""}/>`; }
+function arrowHead(x,y,on,color){ return `<path d="M${x-6},${y-4} L${x},${y} L${x-6},${y+4}" class="w${on?" on":""}" fill="none" ${on?`style="stroke:${color}"`:""}/>`; }
+function F(lx,y,label,val,h=38,hl=false){
+  const x = lx+5, w = 70, v = (val===null||val===undefined) ? "" : String(val);
+  const fs = v.length>11 ? 9 : v.length>8 ? 11 : 13;
+  return R(x,y,w,h,"fld"+(hl?" h":"")) + Tx(x+4,y+11,label,"fl","start") +
+    `<text x="${x+w/2}" y="${y+h/2+10}" class="fv" text-anchor="middle" style="font-size:${fs}px">${esc(v)}</text>`;
+}
+function mux(x,y,h,lab){
+  return `<polygon class="mux" points="${x},${y} ${x+20},${y+9} ${x+20},${y+h-9} ${x},${y+h}"/>` +
+    (lab ? Tx(x+10,y-4,lab,"st","middle",'style="font-size:10px;font-weight:700"') : "");
+}
+function badge(x,y,text,color){
+  const w = text.length*7+12;
+  return `<rect x="${x-w/2}" y="${y-11}" width="${w}" height="16" rx="8" style="fill:${color}"/>` + Tx(x,y+1,text,"badge");
+}
+function stageLabel(c,s){
+  if(!c) return "";
+  const q = c.seq[s];
+  let t;
+  if (q!=null) t = inst[q].text;
+  else if (c.cells[s]==="bubble") t = `bubble (${(c.bubble_kind||{})[s]||""})`;
+  else t = (s==="IF" && c.control_stall) ? "(no fetch: waiting for branch)" : "—";
+  if (c.stall && (s==="IF"||s==="ID") && q!=null) t += "  [STALL]";
+  if (c.flush && c.flushed.includes(q)) t += "  [FLUSH]";
+  return t;
+}
+
+function renderDP(c){
+  const L = c ? c.latches : null, A = c ? c.activity : null;
+  const g = [];
+  const F1 = A ? A.fwd[0] : "ID/EX", F2 = A ? A.fwd[1] : "ID/EX";
+  const taken = !!(A && A.branch && A.branch[0]);
+  const wb = A && A.wb, mem = A && A.mem;
+  const exOp = L && L["EX/MEM"].op;
+  const usesImm = ["ADDI","LW","SW"].includes(exOp);
+  const C = {fwd:"var(--fwd)", br:"var(--flush)", wb:"var(--WB)", mem:"var(--MEM)"};
+
+  // ---- stage bars ----
+  [["IF",0,205],["ID",205,510],["EX",510,825],["MEM",825,1070],["WB",1070,1200]].forEach(([s,x0,x1])=>{
+    g.push(`<rect x="${x0}" y="0" width="${x1-x0}" height="28" style="fill:var(--${s})"/>`);
+    g.push(Tx(x0+8,19,`${s}  ${stageLabel(c,s)}`,"bar","start"));
+  });
+
+  // ---- wires (drawn first) ----
+  // IF
+  g.push(W("M90,205 H100",false), W("M158,205 H170",false), arrowHead(170,205,false));
+  g.push(W("M65,185 V90 H95",false), W("M125,81 H170",false), arrowHead(170,81,false));
+  g.push(W("M110,81 V60 H6 V82 H12",false));                         // PC+4 -> PC mux
+  g.push(W("M22,128 V205 H40",false));                                 // mux -> PC
+  g.push(W("M700,58 V36 H22 V73", taken, C.br));                      // branch target -> PC mux
+  // ID
+  g.push(W("M245,81 H475",false), arrowHead(475,81,false));
+  g.push(W("M245,205 H275",false));
+  g.push(W("M395,137 H475",false), arrowHead(475,137,false));
+  g.push(W("M395,193 H475",false), arrowHead(475,193,false));
+  g.push(W("M255,215 V249 H475",false), arrowHead(475,249,false));
+  g.push(W("M255,215 V349 H475",false), arrowHead(475,349,false));
+  g.push(W("M255,215 V405 H475",false), arrowHead(475,405,false));
+  // EX
+  g.push(W("M550,81 H620 V70 H650",false));                            // PC+4 -> branch adder
+  g.push(W("M550,249 H632 V78 H650",false));                           // imm -> branch adder (offset)
+  g.push(W("M690,66 H790",false), arrowHead(790,81-0,false));          // target
+  g.push(W("M550,122 H575",false), W("M550,187 H575",false));
+  g.push(W("M595,137 H680", F1!=="ID/EX", C.fwd));                    // mux A -> ALU
+  g.push(W("M595,202 H610 V216 H625",false));                          // mux B -> ALUSrc mux
+  g.push(W("M610,202 V249 H790",false), arrowHead(790,249,false));    // store value
+  g.push(W("M550,249 H600 V238 H625",false));                          // imm -> ALUSrc mux (shares)
+  g.push(W("M645,221 H680",false));
+  g.push(W("M740,190 H790",false), arrowHead(790,193,false));
+  g.push(W("M740,150 H760 V137 H790",false), arrowHead(790,137,false)); // eq?
+  g.push(W("M550,349 H790",false), arrowHead(790,349,false));
+  g.push(W("M550,405 H790",false), arrowHead(790,405,false));
+  // forwarding paths
+  g.push(W("M865,193 H876 V444 H565 V137 H575", F1==="EX/MEM", C.fwd));
+  g.push(W("M865,193 H876 V444 H565 V202 H575", F2==="EX/MEM", C.fwd));
+  g.push(W("M1110,193 H1122 V458 H557 V152 H575", F1==="MEM/WB", C.fwd));
+  g.push(W("M1110,193 H1122 V458 H557 V217 H575", F2==="MEM/WB", C.fwd));
+  // MEM
+  g.push(W("M865,193 H905", mem, C.mem));
+  g.push(W("M865,249 H905", mem && mem[0]==="write", C.mem));
+  g.push(W("M1005,200 H1010", mem && mem[0]==="read", C.mem));
+  g.push(W("M885,193 V128 H1000 V178 H1010",false));                  // ALU result bypass
+  g.push(W("M1028,193 H1035",false), arrowHead(1035,193,false));
+  g.push(W("M865,349 H1035",false), arrowHead(1035,349,false));
+  g.push(W("M865,405 H1035",false), arrowHead(1035,405,false));
+  // WB
+  g.push(W("M1110,193 H1185 V472 H262 V258 H275", !!wb, C.wb), arrowHead(275,258,!!wb,C.wb));
+  g.push(W("M1110,349 H1170 V472",false));
+
+  // ---- IF components ----
+  g.push(mux(12,73,55, taken ? "target" : (c && (c.stall||c.control_stall)) ? "hold" : "PC+4"));
+  g.push(R(40,185,50,42,"box") + Tx(65,198,"PC","fl") + Tx(65,219, c ? c.fetch_pc : 0, "bt",'middle','style="font-size:14px"'));
+  if (c && (c.stall || c.control_stall)) g.push(badge(65,242,"HOLD","var(--stall)"));
+  g.push(`<polygon class="alu" points="95,65 125,72 125,90 95,97"/>` + Tx(110,85,"+4","st"));
+  g.push(R(100,160,58,90,"box") + Tx(129,198,"Instr","bt") + Tx(129,213,"Memory","bt"));
+
+  // ---- ID components ----
+  const de = L && L["ID/EX"];
+  g.push(R(275,105,122,172,"box") + Tx(336,121,"Register File","bt"));
+  if (de && de.inst){
+    if (de.rs!=null) g.push(Tx(283,145,`read R${de.rs} = ${de.valA}`,"st","start"));
+    if (de.rt!=null) g.push(Tx(283,200,`read R${de.rt} = ${de.valB}`,"st","start"));
+    if (de.rs==null && de.rt==null) g.push(Tx(283,170,"(no register read)","st muted","start"));
+  } else if (c && c.stall){
+    g.push(Tx(283,170,"stall: ไม่ส่งคำสั่งต่อ","st","start"));
+  }
+  g.push(`<line x1="281" y1="232" x2="391" y2="232" class="w"/>`);
+  g.push(Tx(283,262, wb ? `write R${wb[0]} ← ${wb[1]}` : "write: —", "st","start", wb ? 'style="font-weight:800;fill:var(--WB)"' : ""));
+  // hazard unit
+  let hz = "OK", hzc = null;
+  if (c && c.flush){ hz = "FLUSH IF/ID, ID/EX"; hzc = "var(--flush)"; }
+  else if (c && c.stall){ hz = c.notes.some(n=>n.includes("load-use")) ? "STALL (load-use)" : "STALL (RAW)"; hzc = "var(--stall)"; }
+  else if (c && c.control_stall){ hz = "STALL (branch)"; hzc = "var(--stall)"; }
+  g.push(`<rect x="275" y="296" width="160" height="40" rx="6" class="box" ${hzc?`style="fill:${hzc};stroke:${hzc}"`:""}/>`);
+  g.push(Tx(355,311,"Hazard Unit","bt","middle",hzc?'style="fill:var(--onc)"':""));
+  g.push(Tx(355,328,hz,"st","middle",hzc?'style="fill:var(--onc);font-weight:800"':""));
+  // ---- EX components ----
+  g.push(mux(575,112,52, F1==="ID/EX" ? "A" : "A:"+F1));
+  g.push(mux(575,177,52, F2==="ID/EX" ? "B" : "B:"+F2));
+  g.push(mux(625,196,52, usesImm ? "imm" : ""));
+  g.push(`<polygon class="alu" points="680,112 740,140 740,200 680,232 680,190 692,172 680,154"/>` + Tx(714,176,"ALU","bt"));
+  g.push(`<polygon class="alu" points="650,52 690,58 690,76 650,82"/>` + Tx(670,71,"+","bt"));
+  const xm = L && L["EX/MEM"];
+  if (xm && xm.inst) g.push(Tx(712,252, xm.op==="BEQ"||xm.op==="BNE" ? `${xm.op}: ${xm.taken?"taken":"not taken"}` : `${xm.op} → ${xm.alu}`, "st","middle",'style="font-weight:700"'));
+  // ---- MEM components ----
+  g.push(R(905,150,100,110,"box", mem ? 'style="stroke:var(--MEM);stroke-width:2.5"' : "") + Tx(955,168,"Data Memory","bt"));
+  if (mem){
+    g.push(Tx(955,200, (mem[0]==="read"?"READ ":"WRITE ") + `Mem[${mem[1]}]`, "st","middle",'style="font-weight:800;fill:var(--MEM)"'));
+    g.push(Tx(955,222, (mem[0]==="read"?"→ ":"← ") + mem[2], "bt"));
+  } else g.push(Tx(955,210,"idle","st muted"));
+  g.push(mux(1008,168,52, (L && L["MEM/WB"].op==="LW") ? "mem" : ""));
+  // ---- WB ----
+  if (wb){ g.push(Tx(1155,182,`R${wb[0]} ← ${wb[1]}`,"bt","middle",'style="fill:var(--WB)"')); }
+  else g.push(Tx(1155,182,"",""));
+
+  // ---- latches + fields (drawn on top) ----
+  const lat = (key, x, name, fields) => {
+    const d = L && L[key];
+    g.push(R(x,36,LWID,400,"lt") + Tx(x+LWID/2,50,name,"ln"));
+    fields.forEach(([y,label,val,h]) => g.push(F(x,y,label,d && d.inst ? val(d) : (label==="op" && d && d.bubble ? "bubble" : ""),h||38, false)));
+    if (d && !d.inst && d.bubble) g.push(badge(x+LWID/2,30+422, d.bubble.toUpperCase(), d.bubble==="flush"?"var(--flush)":"var(--stall)"));
+  };
+  lat("IF/ID", LX.L1, "IF/ID", [
+    [62,"PC+4",d=>d.pc4], [170,"instr",d=>d.inst.split(" ")[0], 30], [200,"",d=>d.inst.split(" ").slice(1).join(" "), 30]]);
+  lat("ID/EX", LX.L2, "ID/EX", [
+    [62,"PC+4",d=>d.pc4], [118,"valA",d=>d.valA], [174,"valB",d=>d.valB], [230,"imm",d=>d.imm],
+    [330,"dest",d=>d.dest!=null?`R${d.dest}`:""], [386,"op",d=>d.op]]);
+  lat("EX/MEM", LX.L3, "EX/MEM", [
+    [62,"target",d=>d.target], [118,"taken?",d=>d.taken==null?"":(d.taken?"yes":"no")], [174,"ALU result",d=>d.alu],
+    [230,"valB (store)",d=>d.op==="SW"?d.valB:""], [330,"dest",d=>d.dest!=null?`R${d.dest}`:""], [386,"op",d=>d.op]]);
+  lat("MEM/WB", LX.L4, "MEM/WB", [
+    [174,"write data",d=>d.dest!=null?d.value:""], [330,"dest",d=>d.dest!=null?`R${d.dest}`:""], [386,"op",d=>d.op]]);
+  if (c && c.stall) g.push(badge(LX.L1+LWID/2,452,"HOLD","var(--stall)"));
+
+  // legend
+  g.push(Tx(8,494,"เส้นหนา = กำลังใช้งาน:",  "fl","start"));
+  [["forwarding","var(--fwd)"],["branch taken → PC","var(--flush)"],["write back","var(--WB)"],["memory access","var(--MEM)"]]
+    .forEach(([t,col],i)=>{ const x=140+i*160; g.push(`<line x1="${x}" y1="490" x2="${x+22}" y2="490" style="stroke:${col};stroke-width:3.4"/>` + Tx(x+28,494,t,"fl","start")); });
+  $("dp").innerHTML = g.join("");
+}
+
+/* ======================= panels ======================= */
+function kindOf(n){
+  if (n.startsWith("STALL (control)")) return ["⏸","var(--stall)","หยุด fetch รอผล branch"];
+  if (n.startsWith("STALL")) return ["⏸","var(--stall)","ใส่ bubble เข้า EX, คง IF/ID และ PC ไว้"];
+  if (n.includes("NOT flushed")) return ["⚠","var(--flush)","คำสั่ง 2 ตัวหลัง branch ยังทำงานต่อ"];
+  if (n.includes("TAKEN ->") && n.includes("FLUSH")) return ["↪","var(--flush)","ทิ้งคำสั่งใน IF/ID ที่ fetch มาผิดทาง"];
+  if (n.includes("TAKEN ->")) return ["↪","var(--flush)","PC ← target"];
+  if (n.includes("NOT TAKEN")) return ["→","var(--MEM)","fetch ต่อตามลำดับ"];
+  if (n.startsWith("FWD")) return ["⇢","var(--fwd)","ส่งค่าจาก pipeline register เข้า ALU ตรงๆ"];
+  if (n.includes("NOT HANDLED")) return ["⚠","var(--flush)","ไม่มี hazard unit: จะอ่านได้ค่าเก่า!"];
+  if (n.startsWith("RAW")) return ["!","var(--raw)","ตรวจเจอ data dependency"];
+  if (n.startsWith("WB")) return ["✎","var(--WB)","เขียนผลลง register"];
+  if (n.startsWith("MEM")) return ["✎","var(--MEM)","SW เขียน data memory"];
+  return ["•","var(--muted)",""];
+}
+
+function renderPanels(){
+  const c = cur>=0 ? T.cycles[cur] : null, prev = cur>0 ? T.cycles[cur-1] : null;
+  const N = T.cycles.length;
+  $("cyc").textContent = c ? `Cycle ${c.cycle} / ${N}` + (cur===N-1 && T.finished ? "  ✔ จบ" : "") : `Cycle 0 / ${N} (ก่อนเริ่ม)`;
+  $("bBack").disabled = cur < 0; $("bStep").disabled = $("bEnd").disabled = cur >= N-1; $("bRun").disabled = false; $("bReset").disabled = false;
+
+  // log
+  $("log").innerHTML = !c ? '<li style="--k:var(--muted)">กด <b>Step ▶</b> เพื่อเดิน cycle แรก</li>'
+    : c.notes.length ? c.notes.map(n=>{const [i,k,th]=kindOf(n); return `<li style="--k:${k}"><span class="i">${i}</span><span class="mono">${esc(n)}</span>${th?`<span class="th">${th}</span>`:""}</li>`;}).join("")
+    : '<li style="--k:var(--muted)">ไม่มี hazard ใน cycle นี้ ทุก stage ขยับตามปกติ</li>';
+
+  // listing with stage colours
+  const at = {};
+  if (c) STAGES.forEach(s=>{ const q=c.seq[s]; if(q!=null){ (at[inst[q].pc] ||= []).push(s); }});
+  $("listing").innerHTML = T.program.map(p=>{
+    const st = at[p.pc] || [];
+    const bg = st.length ? `style="background:color-mix(in srgb,var(--${st[0]}) 22%,transparent)"` : "";
+    return `<div ${bg}><span class="a">${p.pc}</span><span class="t">${esc(p.text)}</span><span class="b">${st.map(s=>`<span style="background:var(--${s})">${s}</span>`).join("")}</span></div>`;
+  }).join("");
+
+  // regs + mem
+  const regs = c ? c.regs : new Array(32).fill(0), pr = prev ? prev.regs : new Array(32).fill(0);
+  $("regs").innerHTML = regs.map((v,i)=>`<div class="reg ${v===0?"z":""} ${c&&v!==pr[i]?"c":""}"><span class="n">R${i}</span><span class="v">${v}</span></div>`).join("");
+  const mem = c ? c.mem : [], pm = Object.fromEntries(prev ? prev.mem : []);
+  $("mem").innerHTML = mem.length ? mem.map(([a,v])=>`<div class="${c&&pm[a]!==v?"c":""}"><span>Mem[${a}]</span><b>${v}</b></div>`).join("") : '<span class="muted" style="font-size:12px">ยังไม่มีการเขียน memory</span>';
+
+  // grid highlight
+  document.querySelectorAll("table.pd .cur").forEach(e=>e.classList.remove("cur"));
+  if (c){
+    document.querySelectorAll(`table.pd [data-c="${cur}"]`).forEach(e=>e.classList.add("cur"));
+    const th = document.querySelector(`table.pd thead th[data-c="${cur}"]`), gw = $("grid");
+    if (th && (th.offsetLeft - 150 < gw.scrollLeft || th.offsetLeft + 40 > gw.scrollLeft + gw.clientWidth)) gw.scrollLeft = Math.max(0, th.offsetLeft - 260);
+  }
+  renderDP(c);
+}
+
+function buildGrid(){
+  const N = T.cycles.length, where = {};
+  T.cycles.forEach((c,ci)=>STAGES.forEach(s=>{ const q=c.seq[s]; if(q==null) return;
+    (where[q] ||= {})[ci] = {s, st: c.stall && (s==="IF"||s==="ID"), fl: c.flush && c.flushed.includes(q)}; }));
+  const fl = new Set(T.cycles.flatMap(c=>c.flushed));
+  let h = '<table class="pd"><thead><tr><th class="lbl">Instruction</th>';
+  for (let i=0;i<N;i++) h += `<th data-c="${i}">${i+1}</th>`;
+  h += "</tr></thead><tbody>";
+  T.instances.forEach(it=>{
+    const w = where[it.seq] || {};
+    h += `<tr class="${fl.has(it.seq)?"fl":""}"><td class="lbl mono">${esc(it.text)}</td>`;
+    for (let i=0;i<N;i++){ const x=w[i];
+      h += x ? `<td class="c" data-c="${i}"><span class="${x.fl?"f":x.st?"s":""}" ${x.fl||x.st?"":`style="background:var(--${x.s})"`}>${x.s}${x.fl?"✗":""}</span></td>` : `<td class="c" data-c="${i}"></td>`; }
+    h += "</tr>";
+  });
+  $("grid").innerHTML = h + "</tbody></table>";
+  $("legend").innerHTML = STAGES.map(s=>`<span><i style="background:var(--${s})"></i>${s}</span>`).join("") +
+    '<span><i style="background:repeating-linear-gradient(45deg,var(--stall) 0 4px,#8a5a00 4px 8px)"></i>stall</span><span><i style="background:var(--flush)"></i>flushed ✗</span>';
+}
+
+function renderStats(){
+  const m = T.metrics, f = (v,d=2)=> v==null ? "-" : (Number.isInteger(v) ? v : v.toFixed(d));
+  $("stats").innerHTML = [["Total cycles",m.total_cycles],["Instructions completed",m.instructions_completed],["CPI",f(m.cpi,3)],["IPC",f(m.ipc,3)],
+    ["Pipeline efficiency",f(m.efficiency,1)+"%"],["Speedup",f(m.speedup)+"×"],["Data hazards",m.data_hazards],["Forwards",m.forwards],
+    ["Data stalls",m.stalls],["Control hazards",m.control_hazards],["Branch flushes",m.branch_flushes],["Lost cycles",m.lost_cycles]]
+    .map(([k,v])=>`<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("") +
+    (T.finished ? "" : '<div class="stat"><div class="v">⚠</div><div class="k">ยังรันไม่จบ (ค่าไม่สมบูรณ์)</div></div>');
+}
+
+function renderRef(){
+  let h = "";
+  if (WARN) h += `<div class="ref warn">⚠ ${esc(WARN)}</div>`;
+  if (REF && REF.match===true) h += '<div class="ref ok">✅ ผลลัพธ์ตรงกับ CPU แบบไม่มี pipeline (reference model)</div>';
+  else if (REF && REF.match===false) h += `<div class="ref bad">❌ ผลลัพธ์ไม่ตรงกับ CPU แบบไม่มี pipeline: hazard ไม่ได้ถูกจัดการ<br><span class="mono">${REF.diff.slice(0,6).map(esc).join("<br>")}</span>${REF.diff.length>6?"<br>…":""}</div>`;
+  else if (REF && REF.diff.length) h += `<div class="ref warn">${esc(REF.diff[0])}</div>`;
+  $("ref").innerHTML = h;
+}
+
+/* ======================= actions ======================= */
+function show(i){ if(!T) return; cur = Math.max(-1, Math.min(T.cycles.length-1, i)); renderPanels(); }
+function stop(){ if(timer){ clearInterval(timer); timer=null; } $("bRun").textContent = "▶▶ Run"; }
+function play(){
+  if (!T) return;
+  if (timer) return stop();
+  if (cur >= T.cycles.length-1) show(-1);
+  $("bRun").textContent = "⏸ Pause";
+  timer = setInterval(()=>{ if (cur >= T.cycles.length-1) stop(); else show(cur+1); }, +$("speed").value);
+}
+function editMode(on){ $("src").hidden = !on; $("listing").hidden = on; $("bEdit").hidden = on; }
+
+async function assemble(){
+  stop(); $("err").textContent = "";
+  $("bAsm").disabled = true; $("bAsm").textContent = "กำลังรัน…";
+  try{
+    const r = await fetch("/api/simulate",{method:"POST",headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({source:$("src").value, data:$("dataMode").value, control:$("ctrlMode").value})}).then(r=>r.json());
+    if (!r.ok){ $("err").textContent = "✗ " + r.error; editMode(true); return; }
+    T = r.trace; REF = r.reference; WARN = r.warning;
+    inst = Object.fromEntries(T.instances.map(i=>[i.seq,i]));
+    buildGrid(); renderStats(); renderRef(); editMode(false); show(-1);
+  }catch(e){
+    $("err").textContent = "✗ ติดต่อ Python server ไม่ได้ ให้เปิดหน้านี้ด้วยคำสั่ง  python3 main.py --gui";
+  }finally{ $("bAsm").disabled = false; $("bAsm").textContent = "Assemble"; }
+}
+
+$("bAsm").onclick = assemble;
+$("bReset").onclick = ()=>{ stop(); show(-1); };
+$("bBack").onclick = ()=>{ stop(); show(cur-1); };
+$("bStep").onclick = ()=>{ stop(); show(cur+1); };
+$("bEnd").onclick  = ()=>{ stop(); show(T.cycles.length-1); };
+$("bRun").onclick  = play;
+$("bEdit").onclick = ()=>{ stop(); editMode(true); $("src").focus(); };
+$("speed").oninput = ()=>{ if (timer){ stop(); play(); } };
+$("grid").addEventListener("click", e=>{ const td=e.target.closest("[data-c]"); if(td){ stop(); show(+td.dataset.c); } });
+const descs = ()=>{ $("dataDesc").textContent = DATA_DESC[$("dataMode").value]; $("ctrlDesc").textContent = CTRL_DESC[$("ctrlMode").value]; };
+$("dataMode").onchange = $("ctrlMode").onchange = ()=>{ descs(); if (T) assemble(); };
+document.addEventListener("keydown", e=>{
+  if (["TEXTAREA","SELECT","INPUT"].includes(e.target.tagName) || !T) return;
+  if (e.key==="ArrowRight"){ stop(); show(cur+1); }
+  else if (e.key==="ArrowLeft"){ stop(); show(cur-1); }
+  else if (e.key===" "){ e.preventDefault(); play(); }
+});
+
+let PROGRAMS = [];
+fetch("/api/programs").then(r=>r.json()).then(list=>{
+  PROGRAMS = list;
+  $("preset").innerHTML += list.map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join("");
+  const def = list.findIndex(p=>p.name==="stalls.asm");
+  if (def>=0){ $("preset").value = def; $("src").value = list[def].source; }
+}).catch(()=>{ $("err").textContent = "✗ ติดต่อ Python server ไม่ได้ ให้เปิดหน้านี้ด้วยคำสั่ง  python3 main.py --gui"; });
+$("preset").onchange = ()=>{ const p = PROGRAMS[+$("preset").value]; if(p){ $("src").value = p.source; editMode(true); assemble(); } };
+descs(); renderDP(null);
+$("regs").innerHTML = new Array(32).fill(0).map((v,i)=>`<div class="reg z"><span class="n">R${i}</span><span class="v">0</span></div>`).join("");
+</script>
+</body>
+</html>
